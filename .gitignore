@@ -1,3 +1,10 @@
 # macOS metadata created inside the agents directory
 .agents/.DS_Store
 .agents/prompts/.DS_Store
+
+# Ignore Python bytecode caches everywhere
+**/__pycache__/
+*.py[cod]
+
+# Maven build artifacts
+target/

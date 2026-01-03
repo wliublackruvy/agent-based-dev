@@ -2,271 +2,377 @@
   {
     "id": "BE-001",
     "type": "backend",
-    "title": "Auth Service - Phone OTP & Single Device Binding",
-    "description": "Implement FastAPI endpoints for phone-based OTP login with SMS provider integration, single active session per account, and automatic logout of previous devices. Persist device fingerprint and enforce re-verification when device changes.",
-    "acceptance_criteria": "- POST /auth/request-code sends OTP via SMS sandbox\n- POST /auth/verify returns JWT tied to device_id\n- Second device login invalidates prior refresh token and session\n- Audit log entry created for every login/logout",
+    "title": "Auth Service - Phone OTP Login",
+    "description": "Implement FastAPI endpoints for phone number login, OTP issuance, and verification with single-device binding enforcement. Persist device fingerprints and manage token issuance/refresh with revocation when a new device signs in.",
+    "acceptance_criteria": "- /auth/request-otp accepts phone, rate limits to 1/min, persists hashed OTP\n- /auth/verify accepts phone+OTP, returns JWT bound to device_id, 200 on success\n- Old device tokens are revoked immediately when a new login completes",
     "priority": "P0",
-    "prd_ref": "REQ-1",
-    "status": "todo"
+    "prd_ref": "REQ-1.1",
+    "status": "done",
+    "dependencies": [],
+    "file_path": "src/main/java/com/mingyu/app/AuthApplication.java, src/test/java/com/example/auth/controller/AuthControllerTest.java",
+    "feedback": "Tests Passed."
   },
   {
     "id": "BE-002",
     "type": "backend",
-    "title": "Relationship Binding & Forced Unlink API",
-    "description": "Create APIs for generating 6-digit binding codes, linking exactly two users, and managing mutual or forced unbind flows. Include cooldowns, confirmation logic, and orphaned-data cleanup routines required for single-user forced release.",
-    "acceptance_criteria": "- POST /relationship/bind issues unique code valid for 10 minutes\n- PUT /relationship/confirm links two accounts and returns shared relationship_id\n- DELETE /relationship handles dual-confirm and forced unbind with data purge\n- State machine prevents multiple relationships per user",
+    "title": "Device Binding & Unbind Service",
+    "description": "Create APIs to register a device under a user, support forced unbind after data wipe, and enforce one active device per account. Include audit logs for unbind actions.",
+    "acceptance_criteria": "- /device/bind stores device metadata and associates to user\n- Forced unbind endpoint clears telemetry data and flags audit entry\n- Conflicting bind attempts return 409 with remediation instructions",
     "priority": "P0",
-    "prd_ref": "REQ-1",
-    "status": "todo"
+    "prd_ref": "REQ-1.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-001"
+    ]
   },
   {
     "id": "BE-003",
     "type": "backend",
-    "title": "Permission Status Aggregator & Push Alerts",
-    "description": "Build a service that ingests permission heartbeats (location, notifications, usage access, installation status) from the monitored device, stores latest state, and triggers push notifications to the watcher within 60 seconds of changes.",
-    "acceptance_criteria": "- PATCH /device-status updates permission flags with timestamps\n- Redis/queue job detects changes and sends push in <60s\n- GET /relationship/{id}/status returns current permission snapshot\n- Simulated toggle-off event emits push with correct copy",
+    "title": "Relationship Binding Code Workflow",
+    "description": "Build REST endpoints for generating 6-digit binding codes, validating them, and establishing 1:1 relationships with mutual confirmation plus single-sided forced release path.",
+    "acceptance_criteria": "- /relationship/code returns unique 6-digit code, TTL 10 min\n- /relationship/bind accepts code+partner_id, ensures exclusivity, returns 201\n- Forced release endpoint wipes shared data and updates status with audit trail",
     "priority": "P0",
-    "prd_ref": "REQ-2",
-    "status": "todo"
+    "prd_ref": "REQ-1.2",
+    "status": "todo",
+    "dependencies": [
+      "BE-001"
+    ]
   },
   {
     "id": "BE-004",
     "type": "backend",
-    "title": "Heartbeat Monitor & Unknown State Escalation",
-    "description": "Implement scheduled job that expects device heartbeat packets every minute during active periods and geofence-triggered updates otherwise. If no heartbeat is received for 5 minutes, mark relationship state as unknown/lost and notify watcher.",
-    "acceptance_criteria": "- Heartbeat table tracks last_seen per device\n- Cron or worker transitions to UNKNOWN status after 5 minutes idle\n- Push notification issued immediately on status change\n- Metrics emitted for heartbeat latency and failure counts",
+    "title": "Permission Telemetry Collector",
+    "description": "Implement ingestion endpoints for clients to report permission states (location, notification, autostart, usage access). Store latest state snapshot per device with timestamps for monitoring.",
+    "acceptance_criteria": "- /telemetry/permissions accepts structured payload, validates platform-specific fields\n- Latest status query returns up-to-date states within 5s of ingest\n- Missing updates >5 min trigger status=unknown flag for downstream use",
     "priority": "P0",
-    "prd_ref": "REQ-6",
-    "status": "todo"
-  },
-  {
-    "id": "ALG-001",
-    "type": "algorithm",
-    "title": "Location Data Cleaning & Compression Pipeline",
-    "description": "Design a preprocessing module that denoises incoming GPS samples (Kalman/low-pass filter), deduplicates near-identical points, and compresses tracks before persisting or emitting events so downstream logic receives stable data.",
-    "acceptance_criteria": "- Input noisy track reduced to <=30% redundant points\n- Filter preserves positional accuracy within 15 meters\n- CPU usage profiled <20ms per batch on reference device\n- Unit tests cover jitter scenarios and stationary periods",
-    "priority": "P0",
-    "prd_ref": "REQ-6",
-    "status": "todo"
+    "prd_ref": "REQ-2",
+    "status": "todo",
+    "dependencies": [
+      "BE-002"
+    ]
   },
   {
     "id": "BE-005",
     "type": "backend",
-    "title": "Real-Time Location Sync Service",
-    "description": "Create FastAPI endpoints and worker to accept cleaned GPS data (from ALG-001), enforce 1-minute active sync cadence, persist tracks, and compute live distance between partners for delivery to clients and WebSocket streams.",
-    "acceptance_criteria": "- POST /location accepts batch payload validated against schema\n- Distance computation returns meters/kilometers automatically\n- DB stores per-minute samples with TTL policy\n- Depends on ALG-001 output availability",
+    "title": "Permission State Push Alert Worker",
+    "description": "Create background worker to monitor permission changes and dispatch push notifications to monitoring partner within 60 seconds via notification provider.",
+    "acceptance_criteria": "- Worker scans permission_change stream and enqueues push payloads within 10s\n- Notification delivery API called with Trace ID, success logged\n- SLA metric dashboard proves <60s latency for 95% of changes",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-2",
+    "status": "todo",
+    "dependencies": [
+      "BE-004",
+      "CF-002"
+    ]
   },
   {
     "id": "BE-006",
     "type": "backend",
-    "title": "Geofencing Arrival/Departure Event Generator",
-    "description": "Implement configurable geofence definitions (home, work, custom) per relationship, detect enter/exit events using cleaned tracks, and emit structured events for behavior feed and push notifications.",
-    "acceptance_criteria": "- CRUD endpoints manage geofence polygons/circles\n- Worker detects enter/exit with <150m hysteresis\n- Events published to queue for notification service\n- Depends on BE-005 location persistence",
+    "title": "Real-time Location Ingestion & Storage",
+    "description": "Provide authenticated endpoints (REST + WebSocket) for clients to send GPS samples every minute or on geofence triggers. Persist to time-series storage with distance computation support.",
+    "acceptance_criteria": "- /location/stream accepts batches, validates accuracy, stores with geo index\n- WebSocket ingest path accepts auth token, acknowledges frames with 200-level codes\n- API exposes latest coordinate + distance between partners in meters/km",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
-  },
-  {
-    "id": "ALG-002",
-    "type": "algorithm",
-    "title": "Motion & Trip State Inference Engine",
-    "description": "Develop accelerometer/velocity-based classifier that labels states like boarding vehicle, alighting, or general movement, and exposes API/worker interface to push state transitions to downstream notification flows.",
-    "acceptance_criteria": "- Input sensor stream produces states: stationary, vehicle_on, vehicle_off, walking\n- False positive rate <10% on test dataset\n- State transitions delivered via event bus for BE-007\n- Unit tests cover acceleration edge cases",
-    "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-3.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-002",
+      "CF-002"
+    ]
   },
   {
     "id": "BE-007",
     "type": "backend",
-    "title": "Notification Orchestrator",
-    "description": "Centralize dispatch of permission alerts, geofence events, motion states, and daily safety summaries. Route to push/SMS with rate limits, localized copy, and deduplication keyed per relationship.",
-    "acceptance_criteria": "- Service consumes events from BE-003, BE-006, ALG-002\n- Push delivered via provider SDK with 2s p95 latency\n- Safety summary generated daily at configurable time\n- Duplicate events suppressed within 60 seconds window",
+    "title": "Location Data Cleaning & Compression",
+    "description": "Implement denoising pipeline (Kalman filter + speed caps) and delta compression before persisting location data to reduce noise and storage, ensuring clean input for inference modules.",
+    "acceptance_criteria": "- Pipeline removes spikes (>150 km/h) and smooths jitter within 10m tolerance\n- Compressed payload size reduced by ≥30% compared to raw feed\n- Cleaned coordinates feed downstream topics without gap",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-3.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-006"
+    ]
   },
   {
     "id": "BE-008",
     "type": "backend",
-    "title": "Device Status & Telemetry API",
-    "description": "Expose endpoints to ingest and serve device telemetry (battery level ±10%, WiFi/Cell info) and uninstall detection flags. Store history for 24 hours for UI display and premium analytics.",
-    "acceptance_criteria": "- PATCH /device-telemetry accepts battery/network data\n- Data validation enforces ±10% tolerance\n- GET /relationship/{id}/telemetry returns latest snapshot and history\n- Integration test shows uninstall flag flips UI state",
+    "title": "Heartbeat & Status Monitor",
+    "description": "Track device heartbeats and update relationship status (active, unknown) with notifications when no heartbeat for 5 minutes. Support configurable activity windows.",
+    "acceptance_criteria": "- Heartbeat table records pings per device, TTL 5 min\n- Status transitions to unknown after 5 min gap and triggers push event\n- Monitoring API returns last heartbeat timestamp and derived status",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-6",
+    "status": "todo",
+    "dependencies": [
+      "BE-004",
+      "BE-006"
+    ]
   },
   {
     "id": "BE-009",
     "type": "backend",
-    "title": "Subscription & Entitlement Service",
-    "description": "Integrate App Store, Play Billing, and web payments for the dual-user plans, manage SKU pricing, receipt validation, shared entitlement activation, and downgrade logic.",
-    "acceptance_criteria": "- POST /billing/receipt verifies platform signatures\n- Entitlement table enables premium modules for both partners\n- Grace period logic handles failed renewals\n- Webhook simulation activates/deactivates access correctly",
+    "title": "Behavior & Audit Event Store",
+    "description": "Design schemas and endpoints for storing trajectory replay, unlock events, app usage distribution, Lookus views, and sensitive action logs with querying APIs for dashboards.",
+    "acceptance_criteria": "- Tables/indexes created for each audit event type with retention policy\n- Ingestion endpoints accept batched uploads with validation per metric\n- Query API returns paginated timelines for UI consumption in <500ms",
     "priority": "P1",
     "prd_ref": "REQ-4",
-    "status": "todo"
+    "status": "todo",
+    "dependencies": [
+      "BE-006",
+      "BE-012"
+    ]
   },
   {
     "id": "BE-010",
     "type": "backend",
-    "title": "Audit & History Data Store",
-    "description": "Create scalable storage and APIs for trajectory playback, unlock events, app usage distribution, Lookus view logs, and sensitive action timestamps with pagination and retention policies.",
-    "acceptance_criteria": "- ETL jobs persist trajectories with stop durations\n- GET /audit/unlocks lists timestamps and daily counts\n- Lookus (viewer) access recorded with requester id & time\n- Data partitioned per user and deletable on unbind",
+    "title": "Subscription & Entitlement Service",
+    "description": "Implement plan catalog (monthly/quarterly/yearly), purchase receipt validation, entitlement checks, and automatic feature gating for premium audit functions.",
+    "acceptance_criteria": "- /billing/plans returns plan metadata\n- /billing/verify processes App Store/Play billing receipts, updates entitlements\n- Feature flag middleware restricts premium APIs when entitlement absent",
     "priority": "P1",
-    "prd_ref": "REQ-4",
-    "status": "todo"
+    "prd_ref": "REQ-4.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-001"
+    ]
   },
   {
     "id": "BE-011",
     "type": "backend",
-    "title": "Emergency Alert Endpoint",
-    "description": "Provide secure endpoint to trigger high-priority notifications with custom siren sounds, bypassing silent mode. Include throttling and audit logging for abuse prevention.",
-    "acceptance_criteria": "- POST /emergency triggers push with priority flag\n- Server ensures alert reaches devices in <5s p95\n- Rate limit enforced (e.g., 3 per hour per relationship)\n- Alert recorded in audit log for BE-010",
+    "title": "Emergency Alert Dispatch API",
+    "description": "Expose endpoint for monitored user to trigger critical alert that bypasses silent mode using vendor-specific push priority and fallback SMS if push fails.",
+    "acceptance_criteria": "- /emergency/alert requires auth, accepts message, returns 202\n- Push payload uses high-priority channel and logs vendor response\n- SMS fallback triggered when push not acknowledged in 5s",
     "priority": "P1",
     "prd_ref": "REQ-5",
-    "status": "todo"
+    "status": "todo",
+    "dependencies": [
+      "BE-005"
+    ]
   },
   {
     "id": "BE-012",
     "type": "backend",
-    "title": "WebSocket Channel for Live Updates",
-    "description": "Implement authenticated WebSocket gateway delivering live location, permission states, and telemetry updates with topic separation per relationship and fallbacks to polling when disconnected.",
-    "acceptance_criteria": "- /ws endpoint requires JWT and relationship scope\n- Messages carry trace_id for observability\n- Disconnect detection downgrades to polling after timeout\n- Load test supports 10k concurrent sockets with <1s lag",
-    "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
-  },
-  {
-    "id": "CFG-001",
-    "type": "config",
-    "title": "Observability & Traceability Foundation",
-    "description": "Instrument FastAPI services with structured logging, Trace ID propagation (OpenTelemetry), metrics for heartbeats/location latency, and dashboards/alerts for push failures or missing heartbeats.",
-    "acceptance_criteria": "- All API responses include trace-id header\n- Logs ship to centralized sink with permission/motion tags\n- Grafana/Prometheus dashboard shows heartbeat health and push success\n- Alert fires when heartbeat success rate <95%",
-    "priority": "P0",
-    "prd_ref": "REQ-6",
-    "status": "todo"
-  },
-  {
-    "id": "CFG-002",
-    "type": "config",
-    "title": "Push & SMS Provider Infrastructure Setup",
-    "description": "Configure notification provider credentials, SMS gateways for OTP, secret storage, and CI/CD secrets management to support BE-001, BE-003, and BE-007 flows.",
-    "acceptance_criteria": "- Provider keys stored in secrets manager with rotation policy\n- Sandbox push + SMS tested from staging\n- Deployment manifests mount credentials securely\n- Depends on BE-001 and BE-007 readiness",
-    "priority": "P0",
-    "prd_ref": "REQ-2",
-    "status": "todo"
-  },
-  {
-    "id": "BE-013",
-    "type": "backend",
-    "title": "Privacy Consent & Data Purge Compliance",
-    "description": "Implement APIs and storage hooks to capture explicit consent per permission, expose consent logs, and perform complete data deletion upon forced unbind per privacy rules.",
-    "acceptance_criteria": "- POST /consent logs scope, platform, timestamp\n- Audit endpoint returns consent history for regulators\n- Forced unbind triggers async purge jobs verified in tests\n- User can export consent and deletion confirmation",
-    "priority": "P0",
-    "prd_ref": "REQ-6",
-    "status": "todo"
+    "title": "App Usage & Unlock Telemetry Ingestion",
+    "description": "Implement Android-specific endpoints/service to receive unlock events, usage stats, and screen time per app; normalize and store for UI reporting.",
+    "acceptance_criteria": "- /telemetry/usage accepts structured Android stats, validates timestamps\n- Unlock events recorded with device_id and UTC timestamp precision to seconds\n- Aggregation job outputs per-app usage totals per day",
+    "priority": "P1",
+    "prd_ref": "REQ-4.2",
+    "status": "todo",
+    "dependencies": [
+      "BE-002"
+    ]
   },
   {
     "id": "FE-001",
     "type": "frontend",
-    "title": "Mobile Auth Flow - Phone OTP & Device Binding",
-    "description": "Build cross-platform UI for requesting OTP, input validation, countdown timers, and handling single-device restrictions (show warning when another device is active).",
-    "acceptance_criteria": "- OTP request button disabled until phone valid\n- Verification success navigates to pairing screen\n- If session exists elsewhere, UI prompts to continue with rebind\n- Error states styled per design system",
+    "title": "Cross-platform OTP Login Flow",
+    "description": "Implement mobile/web screens for phone number entry, OTP verification, and error handling. Bind device info after successful login and display single-device warning when needed.",
+    "acceptance_criteria": "- UI matches design on iOS/Android/Web\n- OTP countdown, resend, and error states handled per spec\n- Successful login stores tokens securely and navigates to pairing flow",
     "priority": "P0",
-    "prd_ref": "REQ-1",
-    "status": "todo"
+    "prd_ref": "REQ-1.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-001"
+    ]
   },
   {
     "id": "FE-002",
     "type": "frontend",
-    "title": "Relationship Binding & Management UI",
-    "description": "Implement UI for generating/displaying 6-digit code, entering partner code, showing relationship status, and forced unbind confirmation with data-loss warning modal.",
-    "acceptance_criteria": "- Code modal refreshes every 60s\n- Input state enforces numeric-only six digits\n- Status widget updates instantly after backend response\n- Forced unbind flow requires double confirmation",
+    "title": "Relationship Binding UI",
+    "description": "Build UI for generating binding codes, sharing them, and entering partner codes with status feedback. Include forced release confirmation dialogue with data wipe notice.",
+    "acceptance_criteria": "- Code display refreshes automatically with timer\n- Input validation and success/failure states handled\n- Forced release prompts double confirmation and shows final status",
     "priority": "P0",
-    "prd_ref": "REQ-1",
-    "status": "todo"
+    "prd_ref": "REQ-1.2",
+    "status": "todo",
+    "dependencies": [
+      "BE-003"
+    ]
   },
   {
     "id": "FE-003",
     "type": "frontend",
-    "title": "Permission Onboarding Theater Flow",
-    "description": "Create multi-step guided experience explaining why each permission is needed (location, notifications, auto-start, usage access). Include context screens, OS-specific deep links, and progress indicator.",
-    "acceptance_criteria": "- Steps render contextual copy and animation per permission\n- CTA opens native settings via deep link\n- Completion state stored locally and synced to backend\n- Flow resumes at the correct step after app relaunch",
+    "title": "Permission Theatre Onboarding Flow",
+    "description": "Create guided multi-step experience explaining each permission (location, notifications, autostart, usage access) with rationale, platform-specific deep links, and completion checklist.",
+    "acceptance_criteria": "- Flow lists steps sequentially with progress indicator\n- Each permission explanation screen matches copy/design and opens system settings\n- Completion screen reflects live permission status via telemetry API",
     "priority": "P0",
     "prd_ref": "REQ-2",
-    "status": "todo"
+    "status": "todo",
+    "dependencies": [
+      "BE-004",
+      "FE-001"
+    ]
   },
   {
     "id": "FE-004",
     "type": "frontend",
-    "title": "Permission Status & Anti-Escape Board",
-    "description": "Design dashboard for watcher showing real-time permission health, uninstall detection, and last heartbeat timestamp with color-coded alerts sourced from BE-003.",
-    "acceptance_criteria": "- Status cards update via WebSocket within 60s of change\n- Offline/unknown states highlighted with warning banner\n- Tap-to-view history for last 3 changes per permission\n- Pull-to-refresh fallback hits REST endpoint",
+    "title": "Permission Status Dashboard",
+    "description": "Implement monitoring UI showing partner’s permission states, uninstall detection, and push warning banner when state turns off. Subscribe to push/WebSocket updates for <60s refresh.",
+    "acceptance_criteria": "- Dashboard shows live indicators for location, notifications, autostart, usage access\n- State change reflected within 1 minute of backend update\n- Push notifications deep link to dashboard with highlighted issue",
     "priority": "P0",
     "prd_ref": "REQ-2",
-    "status": "todo"
+    "status": "todo",
+    "dependencies": [
+      "BE-004",
+      "BE-005",
+      "CF-002"
+    ]
   },
   {
     "id": "FE-005",
     "type": "frontend",
-    "title": "Live Map & Distance View",
-    "description": "Implement Mapbox/Apple Maps view with real-time partner pin, satellite/standard toggle, automatic distance unit switching, and gradient trails for recent movement.",
-    "acceptance_criteria": "- Map renders current location with <2s delay via WebSocket\n- Toggle switches map style instantly\n- Distance automatically displays meters <1km and km otherwise\n- Background refresh obeys sync frequency rules",
+    "title": "Real-time Map & Distance View",
+    "description": "Develop map screen with standard/satellite toggle, live position markers for both users, and automatic unit switching (meters/kilometers). Integrate WebSocket feed for smooth updates.",
+    "acceptance_criteria": "- Map renders both markers and updates every minute or on push\n- Toggle switches between map types without reload\n- Distance label auto-switches units based on value thresholds",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-3.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-006",
+      "CF-002"
+    ]
   },
   {
     "id": "FE-006",
     "type": "frontend",
-    "title": "Device Telemetry Panel",
-    "description": "Create UI components for battery gauge, network label (WiFi SSID or 4G/5G), and uninstall indicator with contextual tooltips sourced from BE-008 APIs.",
-    "acceptance_criteria": "- Battery gauge within ±10% of backend value\n- Network label switches icons based on type\n- Uninstall flag triggers critical alert state\n- Pull-to-refresh syncs latest telemetry",
+    "title": "Device Status & Battery Panel",
+    "description": "Create UI components showing partner battery (±10%), network state (WiFi name/4G/5G), and last heartbeat times with warning states when stale.",
+    "acceptance_criteria": "- Battery displayed with percentage and warning color when <15%\n- Network indicator shows WiFi SSID or cellular state\n- Heartbeat timer updates every second and shows 'Unknown' after 5 min gap",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-3.2",
+    "status": "todo",
+    "dependencies": [
+      "BE-006",
+      "BE-008"
+    ]
   },
   {
     "id": "FE-007",
     "type": "frontend",
-    "title": "Behavior Feed & Notifications Center",
-    "description": "Build chronological feed combining geofence events, motion states, safety summaries, and permission alerts with filtering and deep links to map view.",
-    "acceptance_criteria": "- Feed renders grouped events with icons per type\n- User can filter by event category\n- Tapping event navigates to detail (map or audit screen)\n- New events pushed in real-time without app relaunch",
+    "title": "Auto Behavior Notification Center",
+    "description": "Implement UI list for location arrival/departure, travel state updates, and safety reminders with filters. Support deep links from push notifications.",
+    "acceptance_criteria": "- Feed displays behavior entries with timestamp and icon\n- Filters by category (location, motion, safety) work without reload\n- Push deep links open feed and highlight referenced item",
     "priority": "P0",
-    "prd_ref": "REQ-3",
-    "status": "todo"
+    "prd_ref": "REQ-3.3",
+    "status": "todo",
+    "dependencies": [
+      "AL-001",
+      "AL-002",
+      "BE-005"
+    ]
   },
   {
     "id": "FE-008",
     "type": "frontend",
-    "title": "Subscription Purchase & Entitlement UI",
-    "description": "Implement pricing screen for monthly/quarterly/annual plans, integrate native purchase flows, display entitlement status to both partners, and handle grace periods.",
-    "acceptance_criteria": "- Prices localized per platform\n- Purchase success updates entitlement badge without restart\n- Failed renewal shows banner with retry CTA\n- Depends on BE-009 endpoints",
+    "title": "Premium Paywall & Entitlement UI",
+    "description": "Design and implement subscription purchase screens with plan comparison, localized pricing, and entitlement state indicators gating premium features.",
+    "acceptance_criteria": "- Paywall lists monthly/quarterly/yearly plans with localized currency\n- Purchases trigger platform billing flows and show success/failure states\n- Premium-only modules are visually locked until entitlement confirmed",
     "priority": "P1",
-    "prd_ref": "REQ-4",
-    "status": "todo"
+    "prd_ref": "REQ-4.1",
+    "status": "todo",
+    "dependencies": [
+      "BE-010"
+    ]
   },
   {
     "id": "FE-009",
     "type": "frontend",
-    "title": "Audit & Playback Experience",
-    "description": "Create premium screens for trajectory playback (timeline scrubber, speed graph), unlock logs, app usage charts, Lookus access list, and sensitive action timeline sourced from BE-010.",
-    "acceptance_criteria": "- Map playback animates full-day track with pause/resume\n- Unlock log lists timestamps with daily totals\n- Usage chart renders stacked bars for Android data\n- Sensitive actions timeline shows close-locate/force-exit entries",
+    "title": "Audit & Trajectory Replay Screens",
+    "description": "Build UI for timeline of location tracks, speed, stop durations, unlock counts, screen time charts, and Lookus records with date filters and playback controls.",
+    "acceptance_criteria": "- Trajectory map replays movement with scrubbable timeline\n- Unlock and usage charts render per day with totals\n- Sensitive action logs list events chronologically with source labels",
     "priority": "P1",
     "prd_ref": "REQ-4",
-    "status": "todo"
+    "status": "todo",
+    "dependencies": [
+      "BE-009",
+      "FE-005"
+    ]
   },
   {
     "id": "FE-010",
     "type": "frontend",
-    "title": "Emergency Alert Trigger UI",
-    "description": "Provide prominent button with confirmation sheet to fire emergency alerts, showing countdown, success state, and history referencing BE-011.",
-    "acceptance_criteria": "- Button requires slide/confirm to avoid accidental taps\n- Successful trigger shows status screen with trace id\n- Rate limit errors surfaced with helpful copy\n- History list displays last five alerts",
+    "title": "Emergency Alert UI",
+    "description": "Provide dedicated emergency button with confirmation modal allowing optional message; handles alert in-progress state and success/failure feedback.",
+    "acceptance_criteria": "- Button available on dashboard with guard confirmation\n- Sending shows spinner until backend acknowledgement\n- Errors display retry guidance and logs to analytics",
     "priority": "P1",
     "prd_ref": "REQ-5",
-    "status": "todo"
+    "status": "todo",
+    "dependencies": [
+      "BE-011"
+    ]
+  },
+  {
+    "id": "AL-001",
+    "type": "algorithm",
+    "title": "Geofence & Arrival/Departure Detection",
+    "description": "Implement geofence engine that tracks predefined places (home, office) and emits arrival/departure events using cleaned location stream with configurable radius and dwell thresholds.",
+    "acceptance_criteria": "- Arrival fired when user stays within radius for dwell_time\n- Departure fired when user leaves radius for >2 minutes\n- False positives under 5% in QA dataset",
+    "priority": "P0",
+    "prd_ref": "REQ-3.3",
+    "status": "todo",
+    "dependencies": [
+      "BE-007"
+    ]
+  },
+  {
+    "id": "AL-002",
+    "type": "algorithm",
+    "title": "Motion State & Commute Detection",
+    "description": "Create acceleration/speed-based classifier to label motion states (in-vehicle, on foot, stationary) and trigger 'boarding/exiting/active' notifications leveraging cleaned data.",
+    "acceptance_criteria": "- Classifier accuracy ≥85% on validation data\n- State transitions emitted with debounce logic to avoid flapping\n- Outputs published to behavior topic for push worker",
+    "priority": "P0",
+    "prd_ref": "REQ-3.3",
+    "status": "todo",
+    "dependencies": [
+      "BE-007"
+    ]
+  },
+  {
+    "id": "AL-003",
+    "type": "algorithm",
+    "title": "Daily Safety Summary Generator",
+    "description": "Implement job that aggregates trajectory and behavior events to produce daily 'Safe' summaries aligned with typical routines, highlighting deviations.",
+    "acceptance_criteria": "- Summary combines key metrics (locations visited, travel duration, anomalies)\n- Generated once per day per relationship and stored for UI retrieval\n- Deviations flagged when time/location differ from historical baseline",
+    "priority": "P1",
+    "prd_ref": "REQ-3.3",
+    "status": "todo",
+    "dependencies": [
+      "AL-001",
+      "AL-002",
+      "BE-008"
+    ]
+  },
+  {
+    "id": "CF-001",
+    "type": "config",
+    "title": "Observability & Traceability Setup",
+    "description": "Integrate structured logging, distributed tracing (Trace IDs propagated through FastAPI, workers, push provider), and metrics dashboards (latency, error rates, heartbeat SLA).",
+    "acceptance_criteria": "- Trace ID injected in every request/WS frame and logged across services\n- Metrics exported to dashboard with alerts on error spikes and heartbeat misses\n- Log retention policy applied with searchable structured logs",
+    "priority": "P0",
+    "prd_ref": "REQ-6",
+    "status": "todo",
+    "dependencies": []
+  },
+  {
+    "id": "CF-002",
+    "type": "config",
+    "title": "Real-time Channel Infrastructure",
+    "description": "Deploy and configure WebSocket/MQTT broker (e.g., FastAPI WS + Redis pub/sub) with auto-scaling, authentication, and fallback to push when offline to meet <60s latency goals.",
+    "acceptance_criteria": "- WebSocket endpoints handle 1 message/min per device with auth checks\n- Health checks and auto-scaling rules defined for broker pods\n- Offline detection triggers push fallback path within 60s",
+    "priority": "P0",
+    "prd_ref": "REQ-3",
+    "status": "todo",
+    "dependencies": [
+      "CF-001"
+    ]
+  },
+  {
+    "id": "CF-003",
+    "type": "config",
+    "title": "Background Job Scheduler & Queue Setup",
+    "description": "Configure task queue (Celery/RQ) for permission alerts, data cleaning, behavior inference, and summary generation with retry policies and monitoring hooks.",
+    "acceptance_criteria": "- Queue deployed with worker autoscaling and retry/backoff policies\n- Jobs instrumented with Trace IDs and surfaced in monitoring dashboards\n- Failure alerts configured when retries exceed threshold",
+    "priority": "P0",
+    "prd_ref": "REQ-6",
+    "status": "todo",
+    "dependencies": [
+      "CF-001"
+    ]
   }
 ]

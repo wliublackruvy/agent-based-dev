@@ -28,6 +28,10 @@ Instructions:
 - Use `### FILE: <path>` as the separator.
 - Return ONLY the code, no conversational text.
 
+- **Directory Structure**:
+     - **Implementation**: `src/main/java/com/mingyu/app/...`
+     - **Tests**: `src/test/java/com/mingyu/app/...` (MUST mirror the main package structure)
+
 Example Output:
 ### FILE: src/main/java/com/example/demo/HelloController.java
 package com.example.demo;
