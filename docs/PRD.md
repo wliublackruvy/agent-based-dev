@@ -9,6 +9,31 @@
 
 ---
 
+# 0. 技术栈约束 (Technical Stack - MANDATORY)
+
+> **注意：本项目有严格的技术选型要求，所有代码生成必须遵守。**
+
+## 前端 (Frontend)
+* **框架**: **UniApp (基于 Vue 3 + Vite)**。
+* **目标平台**: 优先生成跨平台代码 (H5/App/小程序)。
+* **原生开发**: 仅在 UniApp 无法实现特定硬件调用时，才使用原生代码：
+    * iOS: Swift
+    * Android: Kotlin
+    * *当前阶段优先使用 UniApp 插件市场或标准 API，尽量避免原生混编。*
+
+## 后端 (Backend)
+* **语言**: **Java (JDK 17+)**
+* **框架**: **Spring Boot 3.x**
+* **构建工具**: Maven
+* **数据库**: MySQL / Redis
+* **ORM**: MyBatis-Plus 或 JPA
+
+## 测试规范 (Testing)
+* **后端**: 使用 **JUnit 5** + **Mockito** 进行单元测试。
+* **前端**: 使用 **Vitest** 测试 Vue 组件逻辑。
+
+---
+
 ## ## 1. 账号与关系管理 (P0)
 
 * **登录体系**：

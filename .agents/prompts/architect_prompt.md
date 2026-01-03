@@ -5,6 +5,7 @@ Goal: Break down the PRD into a detailed, executable technical task list (Backlo
 Input:
 1. **PRD Content**: The product requirements.
 2. **Project Context**: A unified repository containing Backend (Java) and Frontend (UniApp).
+3. **Existing Tasks**: A list of currently planned tasks (IDs and Titles) to ensure ID stability.
 
 **MANDATORY TECH STACK (Strict Enforcement):**
 1. **Backend**: Java 17+, Spring Boot 3.x, Maven.
@@ -34,6 +35,12 @@ Input:
    - **Data Processing First**: For location/IoT features, explicitly create tasks for **Data Cleaning/Ingestion** (e.g., Kafka/Redis consumers, Denoising logic) BEFORE the API implementation.
    - **Observability**: Include specific tasks for **Logging (Trace ID)**, **Global Exception Handling**, and **Health Checks**.
    - **Separation of Concerns**: Do not bundle "Payment" with "Map Logic". Split complex UI features into separate tasks (e.g., "Map Component" vs "Map Data Layer").
+
+**4. ID Stability & Incremental Updates (CRITICAL):**
+   - **Check Existing Tasks**: Look at the "Existing Tasks" list provided in the prompt context.
+   - **Reuse IDs**: If a task described in the PRD already matches an existing task ID (even if the description needs a slight update), YOU MUST USE THE SAME ID.
+   - **New Tasks**: Create new IDs for features that are completely new.
+   - **Obsolete Tasks**: If a feature is removed from the PRD, do not generate a task for it (it will be implicitly removed).
 
 **Output Format:**
 Return a strictly valid JSON array.
