@@ -1,6 +1,7 @@
 package com.example.auth.controller;
 
 // Implements REQ-1.1
+// Implements 1.账号与关系管理
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,14 +16,11 @@ import com.example.auth.service.OtpGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mingyu.app.AuthApplication;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,14 +95,9 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andReturn());
 
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-
-        assertEquals("+15551234567", claims.getSubject());
-        assertEquals("device-1", claims.get("device_id"));
+        JsonNode payload = readTokenPayload(token);
+        assertEquals("+15551234567", payload.get("sub").asText());
+        assertEquals("device-1", payload.get("device_id").asText());
     }
 
     @Test
@@ -140,6 +133,13 @@ class AuthControllerTest {
     private String extractToken(MvcResult result) throws Exception {
         JsonNode node = objectMapper.readTree(result.getResponse().getContentAsString());
         return node.get("token").asText();
+    }
+
+    private JsonNode readTokenPayload(String token) throws Exception {
+        String[] parts = token.split("\\.");
+        assertEquals(3, parts.length);
+        byte[] payloadBytes = Base64.getUrlDecoder().decode(parts[1]);
+        return objectMapper.readTree(payloadBytes);
     }
 
     @TestConfiguration

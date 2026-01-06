@@ -1,0 +1,49 @@
+# // Implements System
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: "${MYSQL_JDBC_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:relationship}?useSSL=false&serverTimezone=UTC}"
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: "${REDIS_PASSWORD:}"
+      database: ${REDIS_DATABASE:0}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: when_authorized
+      roles: ACTUATOR
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - readinessState
+            - db
+            - redis
+          additional-path: readiness
+        liveness:
+          include:
+            - livenessState
+            - ping
+          additional-path: liveness
+
+monitoring:
+  health:
+    username: ${HEALTH_USERNAME:health-probe}
+    password: ${HEALTH_PASSWORD:health-secret}

@@ -7,7 +7,7 @@
     "acceptance_criteria": "- mvn clean install succeeds\n- src/main/java/com/mingyu/app/Application.java boots without errors\n- pom.xml lists required dependencies and plugins (compiler 17, spring-boot-maven-plugin)",
     "priority": "P0",
     "prd_ref": "System",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -18,7 +18,7 @@
     "acceptance_criteria": "- npm run dev renders starter page\n- Vitest basic sample passes\n- manifest.json/pages.json include login placeholder page",
     "priority": "P0",
     "prd_ref": "System",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -29,7 +29,7 @@
     "acceptance_criteria": "- docker compose up launches healthy MySQL & Redis\n- Data directories persist after restart\n- README snippet documents startup instructions",
     "priority": "P0",
     "prd_ref": "System",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -40,7 +40,7 @@
     "acceptance_criteria": "- Entities map to tables with constraints (unique phone, one active relationship)\n- Data access layer supports CRUD operations\n- Unit tests cover repository persistence of relationship lifecycle",
     "priority": "P0",
     "prd_ref": "1.账号与关系管理",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -51,7 +51,7 @@
     "acceptance_criteria": "- Valid OTP returns 200 with JWT + refresh token payload\n- Invalid or expired OTP returns 401 error code\n- JUnit tests cover success, failure, and device rebind scenarios",
     "priority": "P0",
     "prd_ref": "1.账号与关系管理",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -62,7 +62,7 @@
     "acceptance_criteria": "- POST /api/bind/code generates code with expiry\n- POST /api/bind/confirm links two users and emits event\n- Integration test ensures duplicate binding prevented and codes expire",
     "priority": "P0",
     "prd_ref": "1.账号与关系管理",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -73,7 +73,7 @@
     "acceptance_criteria": "- Dual confirmation flow requires both approvals within SLA\n- Force unbind endpoint clears historical data and notifies partner\n- Unit tests cover both flows and state transitions",
     "priority": "P0",
     "prd_ref": "1.账号与关系管理",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -84,7 +84,7 @@
     "acceptance_criteria": "- Worker consumes queue/topic and upserts sanitized GPS records\n- Applies jitter filter and snapping to geofences\n- Unit tests verify normalization logic for edge cases",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -95,7 +95,7 @@
     "acceptance_criteria": "- Heartbeat older than 60s marks state as stale and triggers event\n- Redis cache stores latest permission snapshot per device\n- Tests validate transitions and notification trigger conditions",
     "priority": "P0",
     "prd_ref": "2.权限引导与存活看板",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -106,7 +106,7 @@
     "acceptance_criteria": "- GET /api/permissions/status responds within 200ms with latest snapshot\n- Stale data flagged with reason codes\n- Controller tests cover healthy and stale cases",
     "priority": "P0",
     "prd_ref": "2.权限引导与存活看板",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -117,7 +117,7 @@
     "acceptance_criteria": "- GET /api/device/status returns battery + network info\n- Values older than 5 minutes flagged as stale\n- Unit tests validate rounding & fallback rules",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -128,7 +128,7 @@
     "acceptance_criteria": "- GET /api/location/distance returns positions, distance, unit\n- Supports mapMode query param (standard|satellite)\n- Tests verify meter/km switching thresholds",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -139,7 +139,7 @@
     "acceptance_criteria": "- Engine emits normalized behavior events with severity tags\n- Configurable thresholds stored in DB\n- Unit tests simulate multiple sensor patterns and validate outputs",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -150,7 +150,7 @@
     "acceptance_criteria": "- GET /api/behavior/feed returns ordered list with paging token\n- Push event triggered within 60s of critical change\n- Controller tests mock service to cover empty/non-empty feeds",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -161,7 +161,7 @@
     "acceptance_criteria": "- Aggregator produces ordered path with dwell annotations\n- Data stored per day with retention policy\n- Tests validate segmentation and stop-duration accuracy",
     "priority": "P1",
     "prd_ref": "4.会员审计功能",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -172,7 +172,7 @@
     "acceptance_criteria": "- POST /api/membership/subscribe stores plan and expiry\n- EntitlementService filters premium API calls\n- Tests cover plan transitions and expiration edge cases",
     "priority": "P1",
     "prd_ref": "4.会员审计功能",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -183,7 +183,7 @@
     "acceptance_criteria": "- Service writes structured logs to MySQL with indices\n- API endpoints fetch logs filtered by date range\n- Tests validate log creation for each event type",
     "priority": "P1",
     "prd_ref": "4.会员审计功能",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -194,7 +194,7 @@
     "acceptance_criteria": "- Service API invoked by engines within 60s of trigger\n- Retries configurable and logged with trace IDs\n- Unit tests mock provider and assert retry/backoff behavior",
     "priority": "P0",
     "prd_ref": "2.权限引导与存活看板",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -205,7 +205,7 @@
     "acceptance_criteria": "- Scheduler scans all active relationships each minute\n- Devices with stale heartbeat updated to LOST state and notify partner\n- Tests simulate missed heartbeat and verify escalation",
     "priority": "P0",
     "prd_ref": "6.开发者核心逻辑",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -216,7 +216,7 @@
     "acceptance_criteria": "- /actuator/health reports MySQL & Redis status\n- Readiness failures propagate proper HTTP codes\n- Integration test ensures health endpoint secured",
     "priority": "P0",
     "prd_ref": "System",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -227,7 +227,7 @@
     "acceptance_criteria": "- All API errors return standardized JSON with traceId\n- Logs include traceId and user/device context\n- Tests verify exception mapper outputs for validation and server errors",
     "priority": "P0",
     "prd_ref": "System",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -238,7 +238,7 @@
     "acceptance_criteria": "- Page renders responsive layout on H5/App\n- Successful login navigates to binding or dashboard\n- Vitest covers form validation and store mutations",
     "priority": "P0",
     "prd_ref": "1.账号与关系管理",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -249,7 +249,7 @@
     "acceptance_criteria": "- Generates code with expiry countdown\n- Accepts partner code and handles error states\n- Vitest mocks API to cover happy/failure branches",
     "priority": "P0",
     "prd_ref": "1.账号与关系管理",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -260,7 +260,7 @@
     "acceptance_criteria": "- Stepper UI shows four permission panels with contextual copy\n- Completion state synced to Pinia and backend\n- Vitest snapshots ensure correct step transitions",
     "priority": "P0",
     "prd_ref": "2.权限引导与存活看板",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -271,7 +271,7 @@
     "acceptance_criteria": "- Polls status API and updates indicators within 60s\n- Shows stale badge when heartbeat exceeds threshold\n- Vitest verifies computed state and rendering logic",
     "priority": "P0",
     "prd_ref": "2.权限引导与存活看板",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -282,7 +282,7 @@
     "acceptance_criteria": "- Displays both markers and distance text updated in real time\n- Mode switch persists selection and reloads tiles\n- Vitest mocks store to verify formatting logic",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -293,7 +293,7 @@
     "acceptance_criteria": "- Shows warning when data stale or battery low\n- Responsive layout for H5/App\n- Vitest verifies computed classes for status thresholds",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -304,7 +304,7 @@
     "acceptance_criteria": "- Infinite scroll loads feed pages via API\n- Critical events display alert styling\n- Vitest ensures filtering logic transforms payload",
     "priority": "P0",
     "prd_ref": "3.实时感知模块",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -315,7 +315,7 @@
     "acceptance_criteria": "- Non-member sees upsell state; member sees data cards\n- Map replay animates path with stop markers\n- Vitest covers entitlement guard and data formatting",
     "priority": "P1",
     "prd_ref": "4.会员审计功能",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   },
   {
@@ -326,7 +326,7 @@
     "acceptance_criteria": "- Button visible on key pages and triggers backend API\n- Offline state queues request and shows banner\n- Vitest verifies emitted events and debounce logic",
     "priority": "P1",
     "prd_ref": "5.安全与紧急联系",
-    "status": "todo",
+    "status": "done",
     "file_path": ""
   }
 ]

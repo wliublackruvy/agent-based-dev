@@ -1,0 +1,15 @@
+// Implements System
+{
+  "name": "Relationship Sense",
+  "appid": "com.mingyu.relationshipsense",
+  "description": "1 vs 1 transparency companion",
+  "versionName": "0.1.0",
+  "versionCode": 100,
+  "transformPx": false,
+  "app-plus": {
+    "distribute": {
+      "ios": {},
+      "android": {}
+    }
+  }
+}

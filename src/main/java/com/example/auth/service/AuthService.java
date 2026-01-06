@@ -1,25 +1,28 @@
 package com.example.auth.service;
 
 // Implements REQ-1.1
+// Implements 1.账号与关系管理
 
 import com.example.auth.exception.InvalidOtpException;
 import com.example.auth.exception.RateLimitException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +30,10 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private static final String DEVICE_CLAIM = "device_id";
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String HEADER_JSON = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
     private final OtpGenerator otpGenerator;
     private final OtpDeliveryClient otpDeliveryClient;
@@ -55,7 +62,7 @@ public class AuthService {
         this.otpTtl = Duration.ofSeconds(otpTtlSeconds);
         this.rateLimitWindow = Duration.ofSeconds(rateLimitSeconds);
         this.tokenTtl = Duration.ofSeconds(tokenTtlSeconds);
-        this.jwtKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.jwtKey = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
     }
 
     public void requestOtp(String phone) {
@@ -102,16 +109,39 @@ public class AuthService {
     }
 
     private String buildJwt(String phone, String deviceId) {
-        Instant issuedAt = Instant.now();
+        Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(tokenTtl);
-        return Jwts.builder()
-                .setSubject(phone)
-                .claim(DEVICE_CLAIM, deviceId)
-                .setId(UUID.randomUUID().toString())
-                .setIssuedAt(Date.from(issuedAt))
-                .setExpiration(Date.from(expiresAt))
-                .signWith(jwtKey, SignatureAlgorithm.HS256)
-                .compact();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sub", phone);
+        payload.put(DEVICE_CLAIM, deviceId);
+        payload.put("jti", UUID.randomUUID().toString());
+        payload.put("iat", issuedAt.getEpochSecond());
+        payload.put("exp", expiresAt.getEpochSecond());
+
+        try {
+            String headerEncoded = base64UrlEncode(HEADER_JSON);
+            String payloadEncoded = base64UrlEncode(OBJECT_MAPPER.writeValueAsString(payload));
+            String signature = sign(headerEncoded + "." + payloadEncoded);
+            return headerEncoded + "." + payloadEncoded + "." + signature;
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to serialize JWT payload", ex);
+        }
+    }
+
+    private static String base64UrlEncode(String value) {
+        return BASE64_URL_ENCODER.encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String sign(String content) {
+        try {
+            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+            mac.init(jwtKey);
+            byte[] signature = mac.doFinal(content.getBytes(StandardCharsets.UTF_8));
+            return BASE64_URL_ENCODER.encodeToString(signature);
+        } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
+            throw new IllegalStateException("Unable to calculate JWT signature", ex);
+        }
     }
 
     private String hashOtp(String otp) {

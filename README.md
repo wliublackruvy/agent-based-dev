@@ -93,3 +93,11 @@ python .agents/orchestrator.py
 - **Orchestrator 卡住**：它会在 50 次循环后停止；查看 `docs/tasks.json` 是否在 `todo`/`review` 之间来回跳转，必要时调整提示词或手动修复仓库。
 
 按照以上流程即可完全依赖 `.agents` 目录完成“规划 → 编码 → 评审”的闭环迭代，而无需直接修改 `src/` 下的具体实现。
+
+## 本地 Docker 开发栈
+<!-- // Implements System -->
+1. 复制配置：`cp .env.example .env`，根据需要修改数据库密码、端口和 `APP_PROFILE`。
+2. 授权脚本：`chmod +x scripts/start-stack.sh scripts/stop-stack.sh`（只需运行一次）。
+3. 启动：`./scripts/start-stack.sh` 会在后台启动 MySQL 8.0 与 Redis，并在终端输出健康状态；再次运行会复用持久化卷。
+4. 停止：`./scripts/stop-stack.sh` 会保留 `mysql_data` 与 `redis_data` 卷，确保数据在重启后依旧存在。
+5. 查看状态：使用 `docker compose ps` 或 `docker compose logs <service>` 获取健康检查结果与日志。

@@ -9,3 +9,6 @@
 
 # Maven build artifacts
 target/
+
+# Local environment overrides
+.env
