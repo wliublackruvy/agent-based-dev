@@ -6,165 +6,141 @@ import argparse
 from pathlib import Path
 from termcolor import colored
 
-# 确保可以导入项目中的其他模块
+# 确保路径正确
 sys.path.append(os.getcwd())
 from agents.lib.llm import call_llm_for_agent
 from agents.config import DOCS_DIR, PRD_FILE
 
-# --- 路径常量定义 ---
-TASK_FILES = {
-    "be": os.path.join(DOCS_DIR, "TASKS_BE.md"),
-    "fe": os.path.join(DOCS_DIR, "TASKS_FE.md")
-}
-DESIGN_FILES = {
-    "be": os.path.join(DOCS_DIR, "design/backend.md"),
-    "fe": os.path.join(DOCS_DIR, "design/frontend.md")
-}
-
-MAX_RETRIES = 3 # 最大自愈重试次数
+TASK_FILES = {"be": os.path.join(DOCS_DIR, "TASKS_BE.md"), "fe": os.path.join(DOCS_DIR, "TASKS_FE.md")}
+DESIGN_FILES = {"be": os.path.join(DOCS_DIR, "design/backend.md"), "fe": os.path.join(DOCS_DIR, "design/frontend.md")}
+MAX_RETRIES = 3
 
 def load_file(path):
-    return open(path, 'r', encoding='utf-8').read() if os.path.exists(path) else ""
+    return Path(path).read_text(encoding='utf-8') if os.path.exists(path) else ""
 
 def save_file(path, content):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as f:
-        f.write(content)
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding='utf-8')
 
-# --- 任务状态管理逻辑 ---
-
-def get_task_info(task_id, role):
-    """从 Markdown 文件中精确提取任务状态、标题和反馈"""
-    content = load_file(TASK_FILES[role])
-    # 匹配格式: - [状态] Task-ID: [模块] 标题 | Ref: 章节 | Feedback: 内容
-    pattern = rf"- \[(.*?)\] {task_id}: (.*?) \| Ref: (.*?) \| Feedback: (.*)"
-    match = re.search(pattern, content)
-    if match:
-        return {
-            "status": match.group(1),
-            "title": match.group(2),
-            "ref": match.group(3),
-            "feedback": match.group(4)
-        }
-    return None
-
-def update_task_in_markdown(task_id, role, new_status, feedback="None"):
-    """将更新后的状态和反馈写回 Markdown 任务列表"""
+def update_task_status(task_id, role, status, feedback="None"):
+    """更新 Markdown 任务行状态与反馈"""
     path = TASK_FILES[role]
-    content = load_file(path)
-    pattern = rf"(- \[(.*?)\] {task_id}: (.*?) \| Feedback: )(.*)"
-    replacement = rf"- [{new_status}] {task_id}: \3 | Feedback: {feedback}"
+    if not os.path.exists(path): return
     
-    new_content = re.sub(pattern, replacement, content)
-    save_file(path, new_content)
+    lines = load_file(path).splitlines()
+    new_lines = []
+    for line in lines:
+        if task_id in line:
+            # 替换状态部分 [todo] -> [review]
+            line = re.sub(r"\[.*?\]", f"[{status}]", line, count=1)
+            # 替换反馈部分
+            line = re.sub(r"Feedback:.*", f"Feedback: {feedback}", line)
+        new_lines.append(line)
+    save_file(path, "\n".join(new_lines))
 
-# --- 文件操作逻辑 ---
-
-def apply_file_changes(llm_output):
-    """解析 ### FILE: 和 ### DELETE: 指令并执行磁盘操作"""
-    # 1. 处理新增/修改
-    file_blocks = re.findall(r"### FILE:\s*(.*?)\n(.*?)(?=\n### FILE:|\n### DELETE:|$)", llm_output, re.DOTALL)
-    for path_str, content in file_blocks:
-        save_file(path_str.strip(), content.strip())
-        print(colored(f"💾 Applied: {path_str.strip()}", "blue"))
+def parse_and_apply(text):
+    """解析 AI 输出的 ### FILE 和 ### DELETE 指令"""
+    files = re.findall(r"### FILE:\s*(.*?)\n(.*?)(?=\n### FILE:|\n### DELETE:|$)", text, re.DOTALL)
+    for path, code in files:
+        save_file(path.strip(), code.strip())
+        print(colored(f"💾 Applied: {path.strip()}", "blue"))
     
-    # 2. 处理删除
-    delete_blocks = re.findall(r"### DELETE:\s*(.*)", llm_output)
-    for path_str in delete_blocks:
-        p = path_str.strip()
-        if os.path.exists(p):
-            os.remove(p)
+    deletes = re.findall(r"### DELETE:\s*(.*)", text)
+    for path in deletes:
+        p = Path(path.strip())
+        if p.exists():
+            p.unlink()
             print(colored(f"🗑️ Deleted: {p}", "red"))
 
-# --- 测试运行逻辑 ---
-
-def run_unit_tests(role):
-    """
-    运行对应平台的测试命令
-    返回: (是否通过, 错误日志)
-    """
-    print(colored("🧪 Running Unit Tests...", "magenta"))
+def run_tests(role):
+    """执行单元测试并捕获日志"""
+    print(colored("🧪 Running Tests...", "magenta"))
+    cmd = ["mvn", "test"] if role == "be" else ["npm", "run", "test:unit"]
     try:
-        if role == "be":
-            # Maven 测试命令示例
-            cmd = ["mvn", "test", "-DfailIfNoTests=false"]
-        else:
-            # UniApp/Vue 测试命令示例
-            cmd = ["npm", "run", "test:unit"]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        return result.returncode == 0, result.stdout + result.stderr
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        # 合并标准输出和错误输出
+        full_log = (res.stdout or "") + (res.stderr or "")
+        return res.returncode == 0, full_log
     except Exception as e:
         return False, str(e)
 
-# --- 核心执行流程 ---
-
-def run_coder_pipeline(task_id, role):
-    print(colored(f"\n🚀 Coder Agent Activation: {task_id} ({role.upper()})", "blue", attrs=["bold"]))
-    
+def run_coder(task_id, role, auto_confirm=False, debug=False):
     # 1. 加载上下文
-    task_info = get_task_info(task_id, role)
-    if not task_info:
-        print(colored(f"❌ Error: Task {task_id} not found.", "red"))
-        return
+    task_content = load_file(TASK_FILES[role])
+    pattern = rf"- \[(.*?)\] ({task_id}: (.*?) \| (.*?) \| Ref: (.*?) \| Feedback: (.*))"
+    match = re.search(pattern, task_content)
+    if not match: 
+        return print(colored(f"❌ Task {task_id} not found", "red"))
+    
+    status, _, title, detail, ref, feedback = match.groups()
+    design = load_file(DESIGN_FILES[role])
+    prd = load_file(PRD_FILE)
+    prompt_tmpl = load_file("agents/prompts/coder_prompt.md")
 
-    design_doc = load_file(DESIGN_FILES[role])
-    prd_content = load_file(PRD_FILE)
-    coder_prompt = load_file("agents/prompts/coder_prompt.md")
-
-    # 2. 初始尝试
     attempt = 0
-    current_feedback = task_info['feedback']
+    current_fb = feedback
     
     while attempt < MAX_RETRIES:
         attempt += 1
-        mode = "REPAIR" if current_feedback != "None" else "INITIAL"
-        print(colored(f"\n[Attempt {attempt}/{MAX_RETRIES}] {mode} Mode...", "cyan"))
-
-        # 构建输入变量
-        user_input = f"""
-        TASK_ID: {task_id}
-        TITLE: {task_info['title']}
-        DESIGN: {design_doc}
-        PRD: {prd_content}
-        FEEDBACK: {current_feedback}
-        """
-
-        # 调用 LLM (模型根据 config.py 自动路由)
-        llm_output = call_llm_for_agent("coder", coder_prompt, user_input)
+        print(colored(f"\n🛠️ Attempt {attempt}/{MAX_RETRIES} for {task_id}", "cyan", attrs=["bold"]))
         
-        # 预检：展示执行计划（可选，如果 LLM 输出包含 Plan）
-        print(colored("\n--- AI Proposed Changes ---", "yellow"))
-        # print(llm_output) # 调试用
+        # 变量替换
+        user_input = (prompt_tmpl
+                      .replace("{{task_id}}", task_id)
+                      .replace("{{task_title}}", title)
+                      .replace("{{task_detail}}", detail)
+                      .replace("{{design_content}}", design)
+                      .replace("{{prd_content}}", prd)
+                      .replace("{{feedback}}", current_fb))
+        
+        system_msg = "You are a Senior Engineer."
 
-        # 3. 询问人类确认 (Safety Gate)
-        confirm = input(colored(f"\nApply changes for {task_id}? (y/n/skip): ", "green"))
-        if confirm.lower() == 'skip': break
-        if confirm.lower() != 'y': continue
+        # --- DEBUG 模式：打印发送给大模型的内容 ---
+        if debug:
+            print(colored("\n" + "="*30 + " DEBUG: LLM INPUT " + "="*30, "magenta"))
+            print(colored(f"System Prompt:\n{system_msg}", "white"))
+            print(colored(f"\nUser Input:\n{user_input}", "white"))
+            print(colored("="*78 + "\n", "magenta"))
 
-        # 4. 应用修改并测试
-        apply_file_changes(llm_output)
-        success, log = run_unit_tests(role)
+        # 调用 Coder 模型
+        output = call_llm_for_agent("coder", system_msg, user_input)
+        
+        # 2. 交互确认
+        if not auto_confirm:
+            print(colored("\n--- AI Proposed Plan ---", "yellow"))
+            print(output.split("### FILE:")[0]) # 预览计划
+            confirm = input(colored("\nApply changes? (y/n/skip): ", "green")).lower()
+            if confirm == 'skip': return
+            if confirm != 'y': continue
+        
+        # 3. 执行应用
+        parse_and_apply(output)
+        
+        # 4. 自动化测试 (TDD)
+        success, log = run_tests(role)
 
         if success:
-            print(colored(f"✅ Success! Task {task_id} passed unit tests.", "green"))
-            update_task_status = "review"
-            update_task_in_markdown(task_id, role, "review", "None")
-            return True
+            print(colored(f"✅ Tests Passed for {task_id}!", "green", attrs=["bold"]))
+            update_task_status(task_id, role, "review", "None")
+            return
         else:
-            print(colored(f"❌ Failure on attempt {attempt}.", "red"))
-            # 记录失败日志作为下一次重试的 Feedback
-            current_feedback = f"Test Failure (Attempt {attempt}): {log[-500:]}"
+            print(colored(f"❌ Tests Failed.", "red"))
+            # 【截取前500行/字符逻辑】
+            # 使用 splitlines 获取行，防止单行过长，并取前 500 个字符
+            clean_log = " ".join(log.splitlines())[:500] 
+            current_fb = f"ERROR LOG: {clean_log}..."
+            
             if attempt == MAX_RETRIES:
-                print(colored("🛑 Max retries reached. Moving to Manual TODO.", "red"))
-                update_task_in_markdown(task_id, role, "todo", current_feedback)
-
-    return False
+                print(colored("🛑 Max retries reached.", "red", attrs=["bold"]))
+                update_task_status(task_id, role, "todo", current_fb)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--task", required=True, help="Task ID (e.g., Task-BE-001)")
-    parser.add_argument("-r", "--role", choices=["be", "fe"], required=True, help="Role (be/fe)")
-    args = parser.parse_args()
+    parser.add_argument("-t", "--task", required=True)
+    parser.add_argument("-r", "--role", choices=["be", "fe"], required=True)
+    parser.add_argument("-y", "--yes", action="store_true", help="自动确认")
+    parser.add_argument("-d", "--debug", action="store_true", help="打印大模型输入") # 新增 debug 选项
     
-    run_coder_pipeline(args.task, args.role)
+    args = parser.parse_args()
+    run_coder(args.task, args.role, auto_confirm=args.yes, debug=args.debug)

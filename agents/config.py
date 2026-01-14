@@ -28,13 +28,13 @@ AGENT_CONFIG = {
         "temperature": 0.1
     },
     "coder": {
-        "provider": "qwen",
-        "model_id": "qwen-coder-turbo",
-        "temperature": 0.5
+        "provider": "codex",
+        "model_id": "gpt-5.2-codex",
+        "temperature": 0.1
     },
     "reviewer": {
-        "provider": "codex",
-        "model_id": "gpt-5.2", # 建议使用稳定型号名
+        "provider": "deepseek",
+        "model_id": "deepseek-chat", # 建议使用稳定型号名
         "temperature": 0.1
     }
 }
