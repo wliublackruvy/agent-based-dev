@@ -29,7 +29,7 @@ AGENT_CONFIG = {
     },
     "coder": {
         "provider": "codex",
-        "model_id": "gpt-5-codex",
+        "model_id": "glm-4.7",
         "temperature": 0.1
     },
     "test_agent": {

@@ -97,16 +97,26 @@ def _call_deepseek_api(system: str, user: str, model_id: str) -> str:
 
 def _call_codex_cli(prompt: str, model_id: str) -> str:
     """调用 Codex CLI (使用 exec 命令)"""
-    fallback_model = "gpt-5.2-Codex"
+    fallback_model = "gpt-5-codex"
     if not model_id:
         print(colored(f"⚠️ reviewer 未在 config.py 中配置 model_id，默认回退为 {fallback_model}", "magenta"))
     model = model_id or fallback_model
-    print(colored(f"🤖 Calling Codex CLI (Model: {model})...", "cyan"))
+    
     try:
         # --full-auto: 跳过所有确认
-        # -m: 指定具体模型型号
         # '-': 从 stdin 读取 prompt
-        cmd = ["codex", "exec", "--full-auto", "-m", model, "-"]
+        cmd = ["codex", "exec", "--full-auto"]
+        
+        # GLM Profile Support
+        if model.lower() == "glm":
+            print(colored(f"🤖 Calling Codex CLI (Profile: glm)...", "cyan"))
+            cmd.extend(["--profile", "glm"])
+        else:
+            print(colored(f"🤖 Calling Codex CLI (Model: {model})...", "cyan"))
+            cmd.extend(["-m", model])
+            
+        cmd.append("-")
+
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
