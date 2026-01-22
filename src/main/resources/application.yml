@@ -12,3 +12,6 @@ spring:
 logging:
   level:
     root: INFO
+    com.mingyu.app: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG

@@ -4,7 +4,7 @@
 
 ## 后端任务列表 (TASKS_BE.md)
 
-- [review] Task-BE-001: [Base] 项目初始化 | 搭建 Spring Boot 3 骨架，集成 MyBatis-Plus、Security、全局异常处理器和统一响应包装 | Ref: 5.1, 6.1, 6.2 | Feedback: None
+- [done] Task-BE-001: [Base] 项目初始化 | 搭建 Spring Boot 3 骨架，集成 MyBatis-Plus、Security、全局异常处理器和统一响应包装 | Ref: 5.1, 6.1, 6.2 | Feedback: Passed Review & Tests
 - [todo] Task-BE-002: [Auth] 实现短信验证码发送接口 | 创建 `/auth/sms/send` 接口，集成阿里云 SDK，在 Redis 中设置 5 分钟过期时间并实现发送频控 | Ref: 6.3, 8.2 | Feedback: None
 - [todo] Task-BE-003: [Auth] 实现登录与单设备绑定接口 | 创建 `/auth/login` 接口，校验验证码，管理用户设备绑定，签发含 `uid`、`deviceId`、`tokenVersion` 的 JWT | Ref: 3.1, 6.3, 8.1 | Feedback: None
 - [todo] Task-BE-004: [Auth] 实现全局 JWT 鉴权过滤器 | 创建 `OncePerRequestFilter`，校验 JWT 合法性、设备匹配性及 `tokenVersion` 一致性 | Ref: 8.1 | Feedback: None

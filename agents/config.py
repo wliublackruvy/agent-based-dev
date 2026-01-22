@@ -14,12 +14,12 @@ SOP_FILE = os.path.join(DOCS_DIR, "SOP.md")
 AGENT_CONFIG = {
     "architect_backend": {
         "provider": "codex",
-        "model_id": "gpt-5.2",
+        "model_id": "gpt-5",
         "temperature": 0.2
     },
     "architect_frontend": {
         "provider": "codex", # 或者根据你的喜好用 codex/qwen
-        "model_id": "gpt-5.2",
+        "model_id": "gpt-5",
         "temperature": 0.3
     },
     "task_broker": {
@@ -29,8 +29,13 @@ AGENT_CONFIG = {
     },
     "coder": {
         "provider": "codex",
-        "model_id": "gpt-5.2-codex",
+        "model_id": "gpt-5-codex",
         "temperature": 0.1
+    },
+    "test_agent": {
+        "provider": "deepseek",  # 建议集成测试用逻辑强的模型
+        "model_id": "deepseek-chat",
+        "temperature": 0.2
     },
     "reviewer": {
         "provider": "deepseek",
@@ -42,3 +47,9 @@ AGENT_CONFIG = {
 # 建议在终端通过 export 设置，不要硬编码在代码里
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# --- 运行参数 ---
+try:
+    DEEPSEEK_TIMEOUT = int(os.getenv("DEEPSEEK_TIMEOUT", "180"))
+except ValueError:
+    DEEPSEEK_TIMEOUT = 180  # fallback when user passes a non-numeric value

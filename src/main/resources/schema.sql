@@ -1,0 +1,48 @@
+CREATE TABLE IF NOT EXISTS `user` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `phone` VARCHAR(20) NOT NULL,
+  `phone_hash` CHAR(64) NOT NULL,
+  `status` TINYINT NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_phone` (`phone`)
+);
+
+CREATE TABLE IF NOT EXISTS `user_device` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NOT NULL,
+  `device_id` VARCHAR(128) NOT NULL,
+  `platform` VARCHAR(16) NOT NULL,
+  `device_model` VARCHAR(64) DEFAULT NULL,
+  `token_version` INT NOT NULL DEFAULT 1,
+  `is_active` TINYINT NOT NULL DEFAULT 1,
+  `last_login_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_device_user` (`user_id`)
+);
+
+CREATE TABLE IF NOT EXISTS `relation` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_a_id` BIGINT NOT NULL,
+  `user_b_id` BIGINT NOT NULL,
+  `status` VARCHAR(16) NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `terminated_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `bind_code` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `code` CHAR(6) NOT NULL,
+  `owner_user_id` BIGINT NOT NULL,
+  `status` VARCHAR(16) NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  `used_by_user_id` BIGINT DEFAULT NULL,
+  `used_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_bind_code_code` (`code`)
+);

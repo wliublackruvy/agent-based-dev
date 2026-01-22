@@ -5,7 +5,7 @@ import re
 import requests
 from termcolor import colored
 # 引用配置，确保模型型号和厂家解耦
-from agents.config import AGENT_CONFIG, DEEPSEEK_API_KEY
+from agents.config import AGENT_CONFIG, DEEPSEEK_API_KEY, DEEPSEEK_TIMEOUT
 
 def call_llm_for_agent(agent_name: str, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
     """
@@ -88,7 +88,7 @@ def _call_deepseek_api(system: str, user: str, model_id: str) -> str:
             ],
             "stream": False
         }
-        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        response = requests.post(url, headers=headers, json=payload, timeout=DEEPSEEK_TIMEOUT)
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
@@ -97,7 +97,7 @@ def _call_deepseek_api(system: str, user: str, model_id: str) -> str:
 
 def _call_codex_cli(prompt: str, model_id: str) -> str:
     """调用 Codex CLI (使用 exec 命令)"""
-    fallback_model = "gpt-4o"
+    fallback_model = "gpt-5.2-Codex"
     if not model_id:
         print(colored(f"⚠️ reviewer 未在 config.py 中配置 model_id，默认回退为 {fallback_model}", "magenta"))
     model = model_id or fallback_model

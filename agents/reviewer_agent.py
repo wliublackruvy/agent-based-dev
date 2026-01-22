@@ -1,6 +1,7 @@
 import sys
 import os
-import json
+import re
+import argparse
 import subprocess
 from pathlib import Path
 from termcolor import colored
@@ -11,119 +12,164 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from lib.llm import call_llm, parse_json_response
+from config import DOCS_DIR
 
 PROJECT_ROOT = Path(os.getcwd())
-TASKS_FILE = DOCS_DIR = PROJECT_ROOT / "docs" / "tasks.json"
-PROMPT_FILE = PROJECT_ROOT / ".agents/prompts/reviewer_prompt.md"
+PROMPT_FILE = PROJECT_ROOT / "agents/prompts/reviewer_prompt.md"
+TASK_FILES = {
+    "be": PROJECT_ROOT / "docs/TASKS_BE.md",
+    "fe": PROJECT_ROOT / "docs/TASKS_FE.md"
+}
+
+def load_text(path):
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+def save_file(path, content):
+    path.write_text(content, encoding="utf-8")
 
 def get_file_tree(root_path):
     """获取项目文件结构，排除无关文件夹"""
     file_list = []
     for root, dirs, files in os.walk(root_path):
-        dirs[:] = [d for d in dirs if d not in {".git", "venv", "__pycache__", ".agents", "node_modules", ".pytest_cache", "target"}]
+        dirs[:] = [d for d in dirs if d not in {".git", "venv", "__pycache__", ".agents", "node_modules", ".pytest_cache", "target", ".idea", ".vscode"}]
         for f in files:
-            if f.endswith((".py", ".ts", ".tsx", ".js", ".md", ".json", ".java", ".xml", ".vue")):
+            if f.endswith((".py", ".ts", ".tsx", ".js", ".md", ".json", ".java", ".xml", ".vue", ".yml", ".sql")):
                 rel_path = os.path.relpath(os.path.join(root, f), root_path)
                 file_list.append(rel_path)
     return "\n".join(file_list)
 
-def load_text(path):
-    return path.read_text(encoding="utf-8") if path.exists() else ""
+def find_review_task(role):
+    """从 Markdown 文件中查找状态为 [review] 的任务"""
+    file_path = TASK_FILES.get(role)
+    if not file_path or not file_path.exists():
+        print(colored(f"❌ Task file not found for role: {role}", "red"))
+        return None
 
-def run_tests_polyglot(test_files):
-    """
-    多语言测试运行器 (Polyglot Test Runner)
-    支持: Java (Maven), Python (Pytest), Frontend (npm)
-    """
-    if not test_files:
-        return False, "No test files found."
+    content = load_text(file_path)
+    # 匹配格式: - [review] Task-ID: Title | Detail | Ref: ... | Feedback: ...
+    pattern = r"- \[(review)\] ((Task-\w+-\d+): (.*?) \| (.*?) \| Ref: (.*?) \| Feedback: (.*))"
+    match = re.search(pattern, content)
+    
+    if match:
+        status, full_line, task_id, title, detail, ref, feedback = match.groups()
+        return {
+            "id": task_id,
+            "title": title,
+            "detail": detail,
+            "ref": ref,
+            "feedback": feedback,
+            "role": role,
+            "raw_line": f"- [{status}] {full_line}"
+        }
+    return None
 
-    first_test = test_files[0]
+def update_task_status(role, task_id, new_status, feedback):
+    """更新 Markdown 文件中的任务状态和反馈"""
+    file_path = TASK_FILES.get(role)
+    if not file_path: return
+
+    content = load_text(file_path)
+    lines = content.splitlines()
+    new_lines = []
+    updated = False
+
+    for line in lines:
+        if task_id in line:
+            # 替换状态
+            line = re.sub(r"\[.*?\]", f"[{new_status}]", line, count=1)
+            # 替换反馈 (Feedback: 后面的所有内容直到行尾)
+            # 注意：如果反馈包含换行符，Markdown 表格/列表通常要求单行，这里假设单行
+            clean_feedback = feedback.replace("\n", " ").replace("\r", "")
+            if "Feedback:" in line:
+                line = re.sub(r"Feedback:.*", f"Feedback: {clean_feedback}", line)
+            else:
+                line += f" | Feedback: {clean_feedback}"
+            updated = True
+            print(colored(f"📝 Updated {task_id} -> [{new_status}]", "cyan"))
+        new_lines.append(line)
+    
+    if updated:
+        save_file(file_path, "\n".join(new_lines))
+
+def run_tests_polyglot(role):
+    """
+    运行测试
+    BE -> Maven Verify
+    FE -> npm run test
+    """
+    print(colored(f"🧪 Executing Tests for Role: {role.upper()}", "cyan"))
+    
     cmd = []
-    
-    print(colored(f"🧪 Preparing to test: {first_test}", "cyan"))
-
-    # === Java (Maven) 策略 ===
-    if first_test.endswith(".java"):
-        # 提取类名: src/test/java/com/example/AuthTest.java -> AuthTest
-        class_name = Path(first_test).stem
-        print(colored(f"☕ Java Detected. Executing Maven: mvn -Dtest={class_name} test", "cyan"))
-        # 注意：Maven 必须在 pom.xml 所在目录运行（通常是根目录）
-        cmd = ["mvn", "-Dtest=" + class_name, "test"]
-
-    # === Python (Pytest) 策略 ===
-    elif first_test.endswith(".py"):
-        print(colored(f"🐍 Python Detected. Executing Pytest.", "cyan"))
-        cmd = ["pytest"] + test_files + ["-v", "--disable-warnings"]
-    
-    # === Frontend (UniApp/Vue) 策略 ===
-    elif first_test.endswith((".ts", ".js", ".vue")):
-         print(colored(f"⚛️ Frontend Detected. Executing npm test.", "cyan"))
-         cmd = ["npm", "run", "test"]
-
+    if role == "be":
+        # 运行集成测试，跳过单元测试以加快速度，或者全跑
+        cmd = ["mvn", "verify", "-B"] 
+    elif role == "fe":
+        cmd = ["npm", "run", "test"]
     else:
-        return False, f"❌ Unknown test file type: {first_test}"
+        return False, "Unknown role"
 
     try:
-        # 运行测试命令
+        # 确保在项目根目录运行
         result = subprocess.run(
             cmd, 
             capture_output=True, 
             text=True, 
-            timeout=120, # Java 编译可能比较慢，给多点时间
-            cwd=PROJECT_ROOT # 关键：确保在项目根目录运行
+            timeout=300, 
+            cwd=PROJECT_ROOT 
         )
         return result.returncode == 0, result.stdout + result.stderr
-    except FileNotFoundError:
-        return False, f"❌ Command not found: {cmd[0]}. Please check your environment (Maven/Python/Node)."
-    except subprocess.TimeoutExpired:
-        return False, "❌ Test execution timed out (120s)."
     except Exception as e:
         return False, str(e)
 
 def main():
-    print("🕵️  Reviewer Agent (Polyglot Edition) is starting...")
+    parser = argparse.ArgumentParser(description="Reviewer Agent")
+    parser.add_argument("-r", "--role", choices=["be", "fe"], required=True, help="Role (be/fe)")
+    parser.add_argument("-t", "--task", help="Specific Task ID (optional, defaults to first [review] task)")
+    args = parser.parse_args()
 
-    if not TASKS_FILE.exists(): return
+    print("🕵️  Reviewer Agent starting...")
 
-    with open(TASKS_FILE, "r") as f:
-        tasks = json.load(f)
-
-    # 1. 找到 Review 任务
-    review_task = None
-    for t in tasks:
-        if t.get("status") == "review":
-            review_task = t
-            break
-    
-    if not review_task:
-        print("💤 Nothing to review.")
+    # 1. 查找任务
+    task = find_review_task(args.role)
+    if not task:
+        print(colored("💤 No tasks waiting for review.", "yellow"))
         return
 
-    print(colored(f"🔍 Inspecting: {review_task['title']}", "blue"))
-    files_str = review_task.get("file_path", "")
-    files = [f.strip() for f in files_str.split(",")] if files_str else []
+    if args.task and task["id"] != args.task:
+        print(colored(f"⚠️  Found {task['id']} but you requested {args.task}. Proceeding with found task.", "yellow"))
 
-    # 2. 检查文件是否存在
-    missing_files = []
-    new_code_content = ""
-    for f_path in files:
-        full_path = PROJECT_ROOT / f_path
-        if full_path.exists():
-            new_code_content += f"\n### FILE: {f_path}\n"
-            new_code_content += full_path.read_text(encoding="utf-8")
-        else:
-            missing_files.append(f_path)
+    print(colored(f"🔍 Inspecting: {task['id']} - {task['title']}", "blue"))
+
+    # 2. 获取代码上下文 (Code Snapshot)
+    # Reviewer 需要看最近修改的文件。由于 Git Diff 比较复杂，
+    # 我们这里简单读取文件树，并让 LLM 结合项目结构进行‘盲审’或者全量审查
+    # 更好的做法是 Coder 应该把修改的文件路径记录下来，但目前架构简单，
+    # 我们让 LLM 审查所有相关代码，或者我们假设最近修改的文件是最重要的。
+    # 为了简化，我们读取 src 下的核心代码传给 LLM。
     
-    if missing_files:
-        print(colored(f"❌ Rejected. Missing files: {missing_files}", "red"))
-        review_task["status"] = "todo"
-        review_task["feedback"] = f"Files failed to write to disk: {missing_files}"
-        with open(TASKS_FILE, "w") as f: json.dump(tasks, f, indent=2)
-        return
+    # 优化：只读取 src 目录下的代码，避免太长
+    src_dir = PROJECT_ROOT / "src"
+    code_content = ""
+    file_count = 0
+    MAX_CHARS = 50000 # 限制 Token
+    
+    for root, _, files in os.walk(src_dir):
+        for f in files:
+            if f.endswith((".java", ".ts", ".vue", ".xml")):
+                p = Path(os.path.join(root, f))
+                # 简单过滤：只看最近修改的？或者看全部。
+                # 这里暂时读取全部，直到 Token 上限
+                txt = load_text(p)
+                if len(code_content) + len(txt) < MAX_CHARS:
+                    code_content += f"\n### FILE: {os.path.relpath(p, PROJECT_ROOT)}\n{txt}\n"
+                    file_count += 1
+                else:
+                    break
+    
+    print(colored(f"📦 Loaded {file_count} source files for Semantic Review.", "magenta"))
 
     # 3. 阶段一：语义审查 (Semantic Review)
-    print(colored("🧠 Performing Semantic Analysis (Code Quality/Duplication)...", "yellow"))
+    print(colored("🧠 Performing Semantic Analysis...", "yellow"))
     
     prompt_template = load_text(PROMPT_FILE)
     file_tree = get_file_tree(PROJECT_ROOT)
@@ -132,57 +178,42 @@ def main():
     === PROJECT FILE TREE ===
     {file_tree}
 
-    === NEW CODE SUBMITTED ===
-    {new_code_content}
+    === CURRENT CODEBASE CONTENT (Sample) ===
+    {code_content}
+    
+    Task ID: {task['id']}
+    Task Description: {task['title']} - {task['detail']}
     """
     
-    # 临时禁用 JSON 模式检查，防止空文件报错，实际使用建议开启异常捕获
     try:
+        # JSON 模式调用
         llm_resp = call_llm(prompt_template, user_prompt, json_mode=True)
         review_result = parse_json_response(llm_resp)
         
         if review_result and review_result.get("status") == "FAIL":
+            reason = review_result.get('reason', 'Unknown semantic issue')
             print(colored("⛔ Review Failed (Semantic Issues):", "red"))
-            print(colored(f"Reason: {review_result.get('reason')}", "red"))
-            review_task["status"] = "todo"
-            review_task["feedback"] = f"Reviewer Rejected: {review_result.get('reason')}"
-            with open(TASKS_FILE, "w", encoding="utf-8") as f:
-                json.dump(tasks, f, indent=2, ensure_ascii=False)
+            print(colored(f"Reason: {reason}", "red"))
+            update_task_status(args.role, task["id"], "todo", f"Reviewer Rejected: {reason}")
             return
+            
     except Exception as e:
-        print(colored(f"⚠️ LLM Review skipped due to error: {e}", "yellow"))
+        print(colored(f"⚠️ LLM Review skipped/error: {e}", "yellow"))
 
     print(colored("✅ Semantic Check Passed.", "green"))
 
     # 4. 阶段二：执行测试 (Execution Review)
-    # 智能识别测试文件：包含 'test' 或者是 .java 且以 Test 结尾
-    test_files = [
-        f for f in files 
-        if "test" in f.lower() or f.endswith("Test.java") or f.endswith("Tests.java")
-    ]
+    passed, log = run_tests_polyglot(args.role)
     
-    if test_files:
-        passed, log = run_tests_polyglot(test_files)
-        if passed:
-            print(colored("✅ All Tests Passed!", "green"))
-            review_task["status"] = "done"
-            review_task["feedback"] = "Tests Passed."
-        else:
-            print(colored("❌ Tests Failed!", "red"))
-            # 打印部分日志
-            print(log[-1000:])
-            review_task["status"] = "todo"
-            review_task["feedback"] = f"Reviewer Test Failure:\n{log[-1000:]}"
+    if passed:
+        print(colored("✅ All Tests Passed!", "green"))
+        update_task_status(args.role, task["id"], "done", "Passed Review & Tests")
     else:
-        print(colored("⚠️  No tests found in submission. Manual check recommended.", "yellow"))
-        # 这里你可以选择是否放行
-        review_task["status"] = "done"
-
-    # 保存状态
-    with open(TASKS_FILE, "w", encoding="utf-8") as f:
-        json.dump(tasks, f, indent=2, ensure_ascii=False)
-    
-    print(f"Task status updated to: {review_task['status']}")
+        print(colored("❌ Tests Failed!", "red"))
+        # 提取关键错误日志
+        core_error = log[-2000:] # 取最后2000字符
+        print(core_error)
+        update_task_status(args.role, task["id"], "todo", f"Test Failed. Log: {core_error[:200]}...")
 
 if __name__ == "__main__":
     main()
